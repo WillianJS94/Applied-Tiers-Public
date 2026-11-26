@@ -1,0 +1,125 @@
+{
+  "includes": [
+    "common/common.json",
+    "common/player_inventory.json",
+    "common/toolbox.json"
+  ],
+  "background": {
+    "texture": "guis/appliedtiers_elite_molecular_assembler.png",
+    "textureWidth": 512,
+    "textureHeight": 256,
+    "srcRect": [
+      0,
+      0,
+      280,
+      244
+    ]
+  },
+  "slots": {
+    "APPLIEDTIERS_ASSEMBLER_GRID_1": {
+      "left": 79,
+      "top": 22,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "APPLIEDTIERS_ASSEMBLER_OUTPUT_1": {
+      "left": 176,
+      "top": 40
+    },
+    "APPLIEDTIERS_ASSEMBLER_GRID_2": {
+      "left": 11,
+      "top": 88,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "APPLIEDTIERS_ASSEMBLER_OUTPUT_2": {
+      "left": 108,
+      "top": 106
+    },
+    "APPLIEDTIERS_ASSEMBLER_GRID_3": {
+      "left": 147,
+      "top": 88,
+      "grid": "BREAK_AFTER_3COLS"
+    },
+    "APPLIEDTIERS_ASSEMBLER_OUTPUT_3": {
+      "left": 244,
+      "top": 106
+    },
+    "ENCODED_PATTERN": {
+      "left": 279,
+      "top": 114
+    },
+    "PLAYER_INVENTORY": {
+      "left": 60,
+      "bottom": 84,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 60,
+      "bottom": 26,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "block.appliedtiers.elite_molecular_assembler"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "player_inventory_title": {
+      "text": {
+        "translate": "container.inventory"
+      },
+      "position": {
+        "left": 60,
+        "bottom": 95
+      }
+    }
+  },
+  "images": {
+    "progress": {
+      "texture": "guis/appliedtiers_elite_molecular_assembler.png",
+      "textureWidth": 512,
+      "textureHeight": 256,
+      "srcRect": [
+        280,
+        0,
+        6,
+        18
+      ]
+    },
+    "patternPanel": {
+      "texture": "guis/appliedtiers_elite_molecular_assembler.png",
+      "textureWidth": 512,
+      "textureHeight": 256,
+      "srcRect": [
+        288,
+        0,
+        24,
+        30
+      ]
+    }
+  },
+  "widgets": {
+    "progress0": {
+      "left": 198,
+      "top": 39
+    },
+    "progress1": {
+      "left": 130,
+      "top": 105
+    },
+    "progress2": {
+      "left": 266,
+      "top": 105
+    },
+    "patternPanel": {
+      "right": 2,
+      "top": 108,
+      "width": 24,
+      "height": 30
+    }
+  }
+}

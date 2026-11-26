@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "F": "ae2:fluix_crystal",
+    "C": "ae2:engineering_processor",
+    "P": "appliedtiers:elite_pattern_provider"
+  },
+  "pattern": [
+    "FCF",
+    "CPC",
+    "FCF"
+  ],
+  "result": {
+    "id": "appliedtiers:ultimate_pattern_provider",
+    "count": 1
+  }
+}

@@ -1,0 +1,809 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+    id 'maven-publish'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Minecraft 26.1.2 usa Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            programArguments.addAll '--tests', 'appliedtiers:*'
+        }
+        client {
+            client()
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Usamos o mod completo porque os providers dos proximos tiers
+    // reutilizarao classes internas do AE2, nao apenas sua API publica.
+    implementation "org.appliedenergistics:appliedenergistics2:${ae2_version}"
+    implementation "org.appliedenergistics:guideme:${guideme_version}"
+}
+
+def generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    def replaceProperties = [
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_version            : mod_version,
+            mod_license            : mod_license,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            ae2_version            : ae2_version,
+            guideme_version        : guideme_version
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+
+// Generate all three compact GUI textures from the original AE2-style Advanced
+// screen. The source asset stays unchanged for reproducibility and licensing.
+// Remove two unused vertical areas (12 px above Patterns, 16 px before Return
+// Inventory), and insert 18 px for each additional row in Elite / Ultimate.
+def generateTierTextures = tasks.register("generateTierTextures") {
+    def sourceImage = layout.projectDirectory.file(
+            "src/main/resources/assets/ae2/textures/guis/appliedtiers_advanced.png")
+    def outputDir = layout.buildDirectory.dir("generated/resources/tierTextures")
+
+    inputs.file(sourceImage)
+    outputs.dir(outputDir)
+
+    doLast {
+        def original = javax.imageio.ImageIO.read(sourceImage.asFile)
+        if (original == null || original.width != 256 || original.height != 256) {
+            throw new GradleException("Advanced Provider GUI source texture must be 256x256")
+        }
+
+        def destinationDir = new File(outputDir.get().asFile, "assets/ae2/textures/guis")
+        destinationDir.mkdirs()
+
+        [advanced: 2, elite: 4, ultimate: 8].each { tier, rows ->
+            int extraRows = rows - 2
+            int extraPixels = extraRows * 18
+            int visibleHeight = 205 + extraPixels
+            int textureHeight = visibleHeight <= 256 ? 256 : 512
+            def target = new java.awt.image.BufferedImage(
+                    256, textureHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+            def graphics = target.createGraphics()
+            try {
+                // Original header up to y=19: title, frame and buttons intact.
+                graphics.drawImage(original, 0, 0, 256, 20,
+                        0, 0, 256, 20, null)
+
+                // Original y=20..31 is blank spacer; remove these 12px.
+                // Keep the Patterns label and first two slot rows intact.
+                graphics.drawImage(original, 0, 20, 256, 68,
+                        0, 32, 256, 80, null)
+
+                // Add copies of the existing second 9-slot row, not redrawn slots.
+                for (int n = 0; n < extraRows; n++) {
+                    int targetTop = 68 + n * 18
+                    graphics.drawImage(original, 0, targetTop, 256, targetTop + 18,
+                            0, 62, 256, 80, null)
+                }
+
+                // Use the original player inventory's two-pixel seam between
+                // rows. Keep the 18px slot pitch and the outer grid border.
+                for (int row = 1; row < rows; row++) {
+                    int seamTop = 33 + row * 18 - 2
+                    graphics.drawImage(original, 7, seamTop, 169, seamTop + 2,
+                            7, 165, 169, 167, null)
+                }
+
+                // Keep original pixel band separating the pattern grid from
+                // the section below, followed by removing y=83..98 (16px).
+                graphics.drawImage(original,
+                        0, 68 + extraPixels, 256, 71 + extraPixels,
+                        0, 80, 256, 83, null)
+
+                // Move Return Inventory, player inventory and hotbar upward.
+                graphics.drawImage(original,
+                        0, 71 + extraPixels, 256, visibleHeight,
+                        0, 99, 256, 233, null)
+            } finally {
+                graphics.dispose()
+            }
+
+            def destination = new File(destinationDir, "appliedtiers_${tier}_compact.png")
+            if (!javax.imageio.ImageIO.write(target, "png", destination)) {
+                throw new GradleException("Could not generate compact GUI: " + destination)
+            }
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir generateTierTextures
+
+def addonJar = tasks.named("jar", Jar)
+
+tasks.register("verifyTierLayouts") {
+    dependsOn addonJar
+
+    doLast {
+        def resourcesDir = file("src/main/resources")
+        def generatedDir = layout.buildDirectory.dir("generated/resources/tierTextures").get().asFile
+        def original = javax.imageio.ImageIO.read(
+                new File(resourcesDir, "assets/ae2/textures/guis/appliedtiers_advanced.png"))
+        def parser = new groovy.json.JsonSlurper()
+
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            // Check the packaged bytes, including all layouts, recipes, block
+            // resources and the original and generated GUI assets.
+            [resourcesDir, generatedDir].each { root ->
+                fileTree(root).files.each { resource ->
+                    def path = root.toPath().relativize(resource.toPath()).toString().replace('\\', '/')
+                    def entry = jar.getEntry(path)
+                    if (entry == null || !Arrays.equals(resource.bytes, jar.getInputStream(entry).withCloseable { it.bytes })) {
+                        throw new GradleException("Missing or altered JAR resource: ${path}")
+                    }
+                }
+            }
+            if (jar.getEntry("META-INF/neoforge.mods.toml") == null) {
+                throw new GradleException("Missing NeoForge metadata in addon JAR")
+            }
+
+            [advanced: 2, elite: 4, ultimate: 8].each { tier, rows ->
+                int extra = (rows - 2) * 18
+                int expectedHeight = 205 + extra
+                def style = parser.parse(new File(resourcesDir, "assets/ae2/screens/appliedtiers_${tier}.json"))
+                def background = style.background
+                def png = javax.imageio.ImageIO.read(
+                        new File(generatedDir, "assets/ae2/textures/guis/appliedtiers_${tier}_compact.png"))
+                // AE2's Blitter defaults each omitted texture dimension to 256.
+                if (png == null || png.width != background.getOrDefault("textureWidth", 256)
+                        || png.height != background.getOrDefault("textureHeight", 256)) {
+                    throw new GradleException("${tier} PNG dimensions do not match its AE2 layout")
+                }
+                def patterns = style.slots.ENCODED_PATTERN
+                def storage = style.slots.STORAGE
+                int patternsLabel = style.text.interface_config.position.top
+                int returnLabel = style.text.interface_stored_items.position.top
+                int playerInvTop = expectedHeight - 84
+                int hotbarTop = expectedHeight - 26
+                if (background.srcRect != [0, 0, 176, expectedHeight]
+                        || background.texture != "guis/appliedtiers_${tier}_compact.png"
+                        || png.width < 176 || png.height < expectedHeight
+                        || patterns.left != 8 || patterns.top != 33 || patterns.grid != "BREAK_AFTER_9COLS"
+                        || storage.left != 8 || storage.top != 87 + extra || storage.grid != "HORIZONTAL"
+                        || patternsLabel != 22 || returnLabel != 76 + extra
+                        || !style.includes.contains("common/player_inventory.json")
+                        || style.slots.keySet() != (["ENCODED_PATTERN", "STORAGE"] as Set)) {
+                    throw new GradleException("Invalid ${tier} compact layout alignment")
+                }
+                if (patternsLabel + 9 > patterns.top - 1 || patterns.top + (rows - 1) * 18 + 17 > returnLabel
+                        || returnLabel + 9 > storage.top - 1 || storage.top + 17 > expectedHeight - 95
+                        || playerInvTop + 2 * 18 + 17 > hotbarTop - 1 || hotbarTop + 17 > expectedHeight) {
+                    throw new GradleException("Overlapping or out-of-bounds sections in ${tier} GUI")
+                }
+
+                // Match every visible pixel against the source grid and panel.
+                // This checks all slot interiors, frames and seams, and catches
+                // scaling or drift in the return grid, inventory and hotbar.
+                for (int y = 0; y < expectedHeight; y++) {
+                    int sourceY
+                    if (y < 20) {
+                        sourceY = y
+                    } else if (y < patterns.top - 1) {
+                        sourceY = y + 12
+                    } else if (y < 68 + extra) {
+                        sourceY = 44 + (y - (patterns.top - 1)) % 18
+                    } else if (y < 71 + extra) {
+                        sourceY = y + 12 - extra
+                    } else {
+                        sourceY = y + 28 - extra
+                    }
+
+                    for (int x = 0; x < 176; x++) {
+                        int expectedY = sourceY
+                        if (x >= 7 && x < 169 && y >= patterns.top + 16 && y < 68 + extra) {
+                            int offset = (y - (patterns.top + 16)) % 18
+                            if (offset < 2 && y < patterns.top + (rows - 1) * 18) {
+                                expectedY = 165 + offset
+                            }
+                        }
+                        if (png.getRGB(x, y) != original.getRGB(x, expectedY)) {
+                            throw new GradleException("Invalid ${tier} GUI pixel at (${x}, ${y})")
+                        }
+                    }
+                }
+                logger.lifecycle("Verified ${tier}: ${rows * 9} patterns, ${png.width}x${png.height} PNG, aligned grids and packaged resources")
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyTierLayouts"
+}
+
+tasks.register("verifyCableProviders") {
+    dependsOn addonJar
+
+    doLast {
+        def parser = new groovy.json.JsonSlurper()
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            def readJson = { String path ->
+                def entry = jar.getEntry(path)
+                if (entry == null) {
+                    throw new GradleException("Missing packaged cable provider resource: ${path}")
+                }
+                jar.getInputStream(entry).withCloseable { parser.parse(it) }
+            }
+            def lang = ["en_us", "pt_br"].collect { readJson("assets/appliedtiers/lang/${it}.json") }
+            ["advanced", "elite", "ultimate"].each { tier ->
+                def block = "${tier}_pattern_provider"
+                def part = "cable_${block}"
+                def item = readJson("assets/appliedtiers/items/${part}.json")
+                def model = readJson("assets/appliedtiers/ae2/parts/${part}.json").model
+                if (item.model.model != "appliedtiers:item/${part}"
+                        || model.type != "ae2:composite"
+                        || !model.models.any { it.model == "appliedtiers:part/${block}_base" }
+                        || !model.models.any { it.type == "ae2:status_indicator" }
+                        || !lang.every { it.containsKey("item.appliedtiers.${part}".toString()) }) {
+                    throw new GradleException("Invalid cable item or part model for ${tier}")
+                }
+                ["to_cable": [block, part], "to_block": [part, block]].each { direction, ids ->
+                    def recipe = readJson("data/appliedtiers/recipe/${block}_${direction}.json")
+                    if (recipe.type != "minecraft:crafting_shapeless"
+                            || recipe.ingredients != ["appliedtiers:${ids[0]}".toString()]
+                            || recipe.result.id != "appliedtiers:${ids[1]}"
+                            || recipe.result.getOrDefault("count", 1) != 1) {
+                        throw new GradleException("Invalid ${tier} conversion: ${direction}")
+                    }
+                }
+                def progression = readJson("data/appliedtiers/recipe/${block}.json")
+                def processors = [advanced: "logic", elite: "calculation", ultimate: "engineering"]
+                def previous = [advanced: "ae2:pattern_provider",
+                                elite: "appliedtiers:advanced_pattern_provider",
+                                ultimate: "appliedtiers:elite_pattern_provider"]
+                def keys = [F: "ae2:fluix_crystal",
+                            C: "ae2:${processors[tier]}_processor".toString(), P: previous[tier]]
+                if (progression.type != "minecraft:crafting_shaped"
+                        || progression.pattern != ["FCF", "CPC", "FCF"] || progression.key != keys
+                        || progression.result.id != "appliedtiers:${block}" || progression.result.count != 1) {
+                    throw new GradleException("Invalid ${tier} progression recipe")
+                }
+                logger.lifecycle("Verified ${tier} cable provider models, translations and both conversions")
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyCableProviders", "runGameTestServer"
+}
+
+tasks.register("verifyProviderTextures") {
+    dependsOn addonJar
+
+    doLast {
+        def dependency = configurations.compileClasspath.files.find {
+            it.name == "appliedenergistics2-${project.ae2_version}.jar"
+        }
+        if (dependency == null) {
+            throw new GradleException("Cannot find the AE2 JAR to verify original textures")
+        }
+        def palettes = [
+                advanced: [0x5568A0, 0x7690DE, 0xA6B7EA, 0xC1CDF0],
+                elite: [0xA56F3F, 0xE59A57, 0xEEBD92, 0xF3D2B3],
+                ultimate: [0x9C4E84, 0xD96DB8, 0xE6A0D1, 0xEEBDDF]
+        ]
+        def gold = [0xB76E22, 0xCE9835, 0xE8C64B, 0xFFE566]
+        def textures = [
+                block: ["pattern_provider", "pattern_provider_alternate",
+                        "pattern_provider_alternate_front", "pattern_provider_alternate_arrow"],
+                part: ["pattern_provider", "pattern_provider_back"]
+        ]
+        def parser = new groovy.json.JsonSlurper()
+        def readEntry = { jar, String path, reader ->
+            def entry = jar.getEntry(path)
+            if (entry == null) {
+                throw new GradleException("Missing provider resource: ${path}")
+            }
+            jar.getInputStream(entry).withCloseable { reader(it) }
+        }
+        def readJson = { jar, String path -> readEntry(jar, path, { parser.parse(it) }) }
+        def readPng = { jar, String path -> readEntry(jar, path, { javax.imageio.ImageIO.read(it) }) }
+
+        new java.util.zip.ZipFile(dependency).withCloseable { original ->
+            new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { addon ->
+                def blockStates = readJson(original, "assets/ae2/blockstates/pattern_provider.json").variants
+                palettes.each { tier, palette ->
+                    String block = "${tier}_pattern_provider"
+                    String cable = "cable_${block}"
+                    String base = "assets/appliedtiers"
+                    def variants = readJson(addon, "${base}/blockstates/${block}.json").variants
+                    def expectedVariants = blockStates.collectEntries { state, variant ->
+                        def suffix = variant.model.endsWith("_oriented") ? "_oriented" : ""
+                        [(state): variant + [model: "appliedtiers:block/${block}${suffix}".toString()]]
+                    }
+                    if (variants != expectedVariants
+                            || readJson(addon, "${base}/items/${block}.json").model.model != "appliedtiers:block/${block}") {
+                        throw new GradleException("Incorrect model or block orientations for ${tier}")
+                    }
+
+                    ["block/${block}": "ae2:block/pattern_provider",
+                     "block/${block}_oriented": "ae2:block/pattern_provider_oriented",
+                     "part/${block}_base": "ae2:part/pattern_provider_base",
+                     "item/${cable}": "ae2:item/cable_pattern_provider"].each { modelPath, parent ->
+                        def model = readJson(addon, "${base}/models/${modelPath}.json")
+                        if (model.parent != parent || model.containsKey("elements")) {
+                            throw new GradleException("Incorrect model inheritance: ${modelPath}")
+                        }
+                        model.textures.values().each { String texture ->
+                            if (!texture.startsWith("appliedtiers:")) {
+                                throw new GradleException("Unexpected texture reference: ${texture}")
+                            }
+                            readPng(addon, "${base}/textures/${texture.split(':', 2)[1]}.png")
+                        }
+                    }
+
+                    textures.each { type, names ->
+                        names.each { name ->
+                            def source = readPng(original, "assets/ae2/textures/${type}/${name}.png")
+                            def actual = readPng(addon, "${base}/textures/${type}/${tier}/${name}.png")
+                            if (actual == null || actual.width != 16 || actual.height != 16
+                                    || source == null || source.width != 16 || source.height != 16) {
+                                throw new GradleException("Expected a 16x16 PNG for ${tier} ${name}")
+                            }
+                            for (int y = 0; y < 16; y++) {
+                                for (int x = 0; x < 16; x++) {
+                                    int pixel = source.getRGB(x, y)
+                                    int index = gold.indexOf(pixel & 0x00ffffff)
+                                    int expected = index >= 0 && (pixel >>> 24) != 0
+                                            ? (pixel & 0xff000000) | palette[index] : pixel
+                                    if (actual.getRGB(x, y) != expected) {
+                                        throw new GradleException("Incorrect pixel at ${tier} ${name} (${x}, ${y})")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    logger.lifecycle("Verified ${tier} provider models, rotations and original AE2 pixels")
+                }
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyProviderTextures"
+}
+
+tasks.register("verifyAddonIdentity") {
+    dependsOn addonJar
+
+    doLast {
+        def artifact = addonJar.get().archiveFile.get().asFile
+        if (artifact.name != "appliedtiers-${project.version}.jar") {
+            throw new GradleException("Incorrect addon JAR name: ${artifact.name}")
+        }
+        new java.util.zip.ZipFile(artifact).withCloseable { jar ->
+            def metadata = jar.getEntry("META-INF/neoforge.mods.toml")
+            def entrypoint = "io/github/willianjs94/appliedtiers/AppliedTiers.class"
+            if (metadata == null || jar.getEntry(entrypoint) == null) {
+                throw new GradleException("Missing addon metadata or entrypoint")
+            }
+            def descriptor = jar.getInputStream(metadata).withCloseable { it.getText("UTF-8") }
+            ["modId=\"appliedtiers\"", "displayName=\"Applied Tiers\"", "version=\"${project.version}\""].each {
+                if (!descriptor.readLines().contains(it.toString())) {
+                    throw new GradleException("Missing metadata field: ${it}")
+                }
+            }
+            def oldName = ~/(?i)more[ -]?providers/
+            jar.entries().each { entry ->
+                if ((entry.name =~ oldName).find()) {
+                    throw new GradleException("Legacy path in JAR: ${entry.name}")
+                }
+                if (entry.name == metadata.name || entry.name.endsWith(".json") || entry.name.endsWith(".class")) {
+                    def contents = jar.getInputStream(entry).withCloseable { it.getText("ISO-8859-1") }
+                    if ((contents =~ oldName).find()) {
+                        throw new GradleException("Legacy reference in JAR: ${entry.name}")
+                    }
+                }
+            }
+            logger.lifecycle("Verified Applied Tiers metadata, class namespace and JAR identity")
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyAddonIdentity"
+}
+
+tasks.register("verifyAdvancedAssemblerAssets") {
+    dependsOn addonJar
+
+    doLast {
+        def parser = new groovy.json.JsonSlurper()
+        String id = "advanced_molecular_assembler"
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            def read = { String path, reader ->
+                def entry = jar.getEntry(path)
+                if (entry == null) {
+                    throw new GradleException("Missing Advanced Assembler resource: ${path}")
+                }
+                jar.getInputStream(entry).withCloseable { reader(it) }
+            }
+            def json = { path -> read(path, { parser.parse(it) }) }
+            def png = { path -> read(path, { javax.imageio.ImageIO.read(it) }) }
+            def gui = json("assets/ae2/screens/appliedtiers_${id}.json")
+            def panel = png("assets/ae2/textures/guis/appliedtiers_${id}.png")
+            def texture = png("assets/appliedtiers/textures/block/${id}.png")
+            if ([panel.width, panel.height] != [256, 256] || gui.background.srcRect != [0, 0, 176, 244]
+                    || [gui.background.textureWidth, gui.background.textureHeight] != [256, 256]
+                    || [gui.images.progress.textureWidth, gui.images.progress.textureHeight] != [256, 256]
+                    || [gui.images.patternPanel.textureWidth, gui.images.patternPanel.textureHeight] != [256, 256]
+                    || gui.images.progress.srcRect != [176, 0, 6, 18] || [texture.width, texture.height] != [16, 16]) {
+                throw new GradleException("Invalid approved Advanced Assembler texture dimensions")
+            }
+            def expectedSlots = [[27,22], [27,88], [124,40], [124,106], [175,114]]
+            if (gui.slots.values().collect { [it.left, it.top] } != expectedSlots
+                    || [gui.widgets.progress0.left, gui.widgets.progress0.top,
+                        gui.widgets.progress1.left, gui.widgets.progress1.top] != [146,39,146,105]
+                    || gui.images.patternPanel.srcRect != [184,0,24,30]
+                    || gui.widgets.patternPanel != [right: 2, top: 108, width: 24, height: 30]
+                    || gui.slots.values().take(2).any { it.grid != "BREAK_AFTER_3COLS" }) {
+                throw new GradleException("Advanced Assembler slot coordinates differ from approved layout")
+            }
+            def ae2 = configurations.compileClasspath.files.find {
+                it.name == "appliedenergistics2-${project.ae2_version}.jar"
+            }
+            new java.util.zip.ZipFile(ae2).withCloseable { source ->
+                def shared = { String path, reader ->
+                    source.getInputStream(source.getEntry("assets/ae2/" + path)).withCloseable { reader(it) }
+                }
+                def inv = shared("screens/common/player_inventory.json", { parser.parse(it) })
+                def toolbox = shared("screens/common/toolbox.json", { parser.parse(it) })
+                def common = shared("screens/common/common.json", { parser.parse(it) })
+                if (!gui.includes.containsAll(["common/common.json", "common/player_inventory.json", "common/toolbox.json"])
+                        || inv.slots.PLAYER_INVENTORY.grid != "BREAK_AFTER_9COLS"
+                        || inv.slots.PLAYER_HOTBAR.grid != "HORIZONTAL") {
+                    throw new GradleException("Assembler shared inventory or toolbar styles changed")
+                }
+                def regions = []
+                def grid = { x, y, cols, rows, step ->
+                    (0..<rows).each { r -> (0..<cols).each { c -> regions << [x + c * step, y + r * step, 16, 16] } }
+                }
+                grid(27, 22, 3, 3, 18)
+                grid(27, 88, 3, 3, 18)
+                regions.addAll([[124,40,16,16], [124,106,16,16], [146,39,6,18], [146,105,6,18]])
+                grid(inv.slots.PLAYER_INVENTORY.left, 244 - inv.slots.PLAYER_INVENTORY.bottom, 9, 3, 18)
+                grid(inv.slots.PLAYER_HOTBAR.left, 244 - inv.slots.PLAYER_HOTBAR.bottom, 9, 1, 18)
+                if (regions.size() != 58 || regions.any { r -> r[0] < 0 || r[1] < 0 || r[0] + r[2] > 176 || r[1] + r[3] > 244 }) {
+                    throw new GradleException("Missing or out-of-bounds main panel regions")
+                }
+                def panelBox = [176 - gui.widgets.patternPanel.right, 108, 24, 30]
+                def upgradeBox = [176 - common.widgets.upgrades.right, common.widgets.upgrades.top, 28, 102]
+                def toolboxBox = [176 - toolbox.widgets.toolbox.right, 244 - toolbox.widgets.toolbox.bottom,
+                                  toolbox.widgets.toolbox.width, toolbox.widgets.toolbox.height]
+                def slot = gui.slots.ENCODED_PATTERN
+                if (slot.left != panelBox[0] + 1 || slot.top != panelBox[1] + 6
+                        || slot.left + 16 > panelBox[0] + panelBox[2] || slot.top + 16 > panelBox[1] + panelBox[3]
+                        || slot.left + 16 <= 176) {
+                    throw new GradleException("Pattern slot is not inside its lateral widget")
+                }
+                regions.addAll([panelBox, upgradeBox, toolboxBox])
+                regions.eachWithIndex { a, i ->
+                    regions.drop(i+1).each { b ->
+                        if (a[0] < b[0]+b[2] && b[0] < a[0]+a[2] && a[1] < b[1]+b[3] && b[1] < a[1]+a[3]) {
+                            throw new GradleException("Overlapping assembler GUI regions: ${a} and ${b}")
+                        }
+                    }
+                }
+                for (int y = 15; y < 18; y++) {
+                    for (int x = 79; x < 99; x++) {
+                        if (panel.getRGB(x, y) != panel.getRGB(70, y)) {
+                            throw new GradleException("Old central pattern frame still visible")
+                        }
+                    }
+                }
+                def originalGui = shared("textures/guis/molecular_assembler.png", { javax.imageio.ImageIO.read(it) })
+                def extra = shared("textures/guis/extra_panels.png", { javax.imageio.ImageIO.read(it) })
+                for (int y = 0; y < 18; y++) {
+                    for (int x = 0; x < 6; x++) {
+                        if (panel.getRGB(176+x, y) != originalGui.getRGB(176+x, y)) {
+                            throw new GradleException("Original progress sprite changed")
+                        }
+                    }
+                }
+                for (int y = 0; y < 30; y++) {
+                    for (int x = 0; x < 24; x++) {
+                        int expected = x < 18 && y >= 5 && y < 23
+                                ? originalGui.getRGB(125+x, 15+y-5) : extra.getRGB(x, y)
+                        if (panel.getRGB(184+x, y) != expected) {
+                            throw new GradleException("Lateral pattern panel differs from original AE2 sprites")
+                        }
+                    }
+                }
+
+                def entry = source.getEntry("assets/ae2/textures/block/molecular_assembler.png")
+                def original = source.getInputStream(entry).withCloseable { javax.imageio.ImageIO.read(it) }
+                def palette = [(0x413F54): 0x5568A0, (0x4D4D67): 0x7690DE]
+                for (int y = 0; y < 16; y++) {
+                    for (int x = 0; x < 16; x++) {
+                        int pixel = original.getRGB(x, y)
+                        boolean ring = x >= 1 && x <= 14 && y >= 1 && y <= 14
+                                && (x == 1 || x == 14 || y == 1 || y == 14)
+                        int expected = ring ? (pixel & 0xff000000) | palette[pixel & 0xffffff] : pixel
+                        if (texture.getRGB(x, y) != expected) {
+                            throw new GradleException("Advanced Assembler differs from approved Spectral palette at ${x},${y}")
+                        }
+                    }
+                }
+            }
+            def model = json("assets/appliedtiers/models/block/${id}.json")
+            def states = json("assets/appliedtiers/blockstates/${id}.json")
+            if (model.parent != "ae2:block/molecular_assembler"
+                    || states.multipart[1].apply.model != "ae2:block/molecular_assembler_lights"
+                    || states.multipart[1].when.powered != "true"
+                    || json("assets/appliedtiers/items/${id}.json").model.model != "appliedtiers:block/${id}") {
+                throw new GradleException("Advanced Assembler lost AE2 model or lighting")
+            }
+            def recipe = json("data/appliedtiers/recipe/${id}.json")
+            def ingredients = [C: "ae2:logic_processor", A: "ae2:speed_card", F: "ae2:fluix_crystal",
+                               P: "ae2:molecular_assembler", M: "ae2:molecular_assembler"]
+            if (recipe.type != "minecraft:crafting_shaped" || recipe.pattern != ["CAC", "FPF", "AMA"]
+                    || recipe.key != ingredients || recipe.result.id != "appliedtiers:${id}" || recipe.result.count != 1) {
+                throw new GradleException("Incorrect Advanced Assembler recipe")
+            }
+            logger.lifecycle("Verified Advanced Assembler GUI coordinates, texture, model, lighting and shaped recipe")
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyAdvancedAssemblerAssets"
+}
+
+
+tasks.register("verifyHigherAssemblerAssets") {
+    dependsOn addonJar
+    doLast {
+        def parser = new groovy.json.JsonSlurper()
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            def read = { String path, reader ->
+                def entry = jar.getEntry(path)
+                if (entry == null) throw new GradleException("Missing assembler resource: ${path}")
+                jar.getInputStream(entry).withCloseable { reader(it) }
+            }
+            def json = { path -> read(path, { parser.parse(it) }) }
+            def png = { path -> read(path, { javax.imageio.ImageIO.read(it) }) }
+            def textureRoot = "assets/ae2/textures/guis/appliedtiers_"
+            def advanced = png(textureRoot + "advanced_molecular_assembler.png")
+            def equalPixels = { from, to, sx, sy, dx, dy, w, h ->
+                for (int y = 0; y < h; y++) {
+                    for (int x = 0; x < w; x++) {
+                        if (from.getRGB(sx + x, sy + y) != to.getRGB(dx + x, dy + y)) return false
+                    }
+                }
+                return true
+            }
+            def plans = [
+                elite: [grids: [[79,22], [11,88], [147,88]], previous: "advanced",
+                    processor: "calculation", sha: "089bbd758a8b5d255162eb37f4d199a241653a283de44fe610ddc68da803b156"],
+                ultimate: [grids: [[11,22], [147,22], [11,88], [147,88]], previous: "elite",
+                    processor: "engineering", sha: "c74334d8e3535a4ae4eda30797df3b30985c2b6432e2096ea2783f6f8f5aadb7"]
+            ]
+            plans.each { tier, plan ->
+                String id = "${tier}_molecular_assembler"
+                def layout = json("assets/ae2/screens/appliedtiers_${id}.json")
+                def atlas = png(textureRoot + id + ".png")
+                if ([atlas.width, atlas.height] != [512,256]
+                        || layout.background.srcRect != [0,0,280,244]
+                        || layout.images.progress.srcRect != [280,0,6,18]
+                        || layout.images.patternPanel.srcRect != [288,0,24,30]
+                        || ([layout.background] + layout.images.values()).any {
+                            [it.textureWidth, it.textureHeight, it.texture] != [512,256, "guis/appliedtiers_${id}.png"]
+                        }
+                        || layout.widgets.patternPanel != [right:2, top:108, width:24, height:30]
+                        || layout.slots.ENCODED_PATTERN != [left:279, top:114]
+                        || layout.slots.PLAYER_INVENTORY != [left:60, bottom:84, grid:"BREAK_AFTER_9COLS"]
+                        || layout.slots.PLAYER_HOTBAR != [left:60, bottom:26, grid:"HORIZONTAL"]
+                        || layout.text.player_inventory_title.position != [left:60, bottom:95]
+                        || layout.slots.size() != plan.grids.size() * 2 + 3
+                        || !equalPixels(advanced, atlas, 176,0,280,0,6,18)
+                        || !equalPixels(advanced, atlas, 184,0,288,0,24,30)
+                        || !equalPixels(advanced, atlas, 7,148,59,148,162,92)
+                        || (4..<59).any { x -> !equalPixels(advanced, atlas, 5,148,x,148,1,92) }
+                        || (221..<276).any { x -> !equalPixels(advanced, atlas, 5,148,x,148,1,92) }) {
+                    throw new GradleException("Invalid compact layout or atlas for ${tier}")
+                }
+                def regions = [[59,148,162,92], [278,0,28,102], [278,108,24,30], [278,154,59,66]]
+                plan.grids.eachWithIndex { grid, i ->
+                    def (x, y) = grid
+                    if (layout.slots["APPLIEDTIERS_ASSEMBLER_GRID_${i + 1}"] != [left:x, top:y, grid:"BREAK_AFTER_3COLS"]
+                            || layout.slots["APPLIEDTIERS_ASSEMBLER_OUTPUT_${i + 1}"] != [left:x+97, top:y+18]
+                            || layout.widgets["progress${i}"] != [left:x+119, top:y+17]
+                            || !equalPixels(advanced, atlas, 24,19,x-3,y-3,130,58)) {
+                        throw new GradleException("Misaligned crafting unit ${i + 1} for ${tier}")
+                    }
+                    regions << [x-3, y-3, 130, 58]
+                }
+                regions.eachWithIndex { a, i ->
+                    regions.drop(i + 1).each { b ->
+                        if (a[0] < b[0]+b[2] && b[0] < a[0]+a[2] && a[1] < b[1]+b[3] && b[1] < a[1]+a[3]) {
+                            throw new GradleException("Overlapping interface regions for ${tier}: ${a}, ${b}")
+                        }
+                    }
+                }
+                def hash = read("assets/appliedtiers/textures/block/${id}.png", {
+                    java.security.MessageDigest.getInstance("SHA-256").digest(it.bytes).encodeHex().toString()
+                })
+                def model = json("assets/appliedtiers/models/block/${id}.json")
+                def state = json("assets/appliedtiers/blockstates/${id}.json")
+                def item = json("assets/appliedtiers/items/${id}.json")
+                def loot = json("data/appliedtiers/loot_table/blocks/${id}.json")
+                def recipe = json("data/appliedtiers/recipe/${id}.json")
+                if (hash != plan.sha || model.parent != "ae2:block/molecular_assembler"
+                        || model.textures.base != "appliedtiers:block/${id}"
+                        || state.multipart[0].apply.model != "appliedtiers:block/${id}"
+                        || state.multipart[1] != [when:[powered:"true"], apply:[model:"ae2:block/molecular_assembler_lights"]]
+                        || item.model.model != "appliedtiers:block/${id}"
+                        || loot.pools[0].entries[0].name != "appliedtiers:${id}") {
+                    throw new GradleException("Incorrect approved texture, model, lights or drop for ${tier}")
+                }
+                if (recipe.type != "minecraft:crafting_shaped" || recipe.pattern != ["CAC","FPF","AMA"]
+                        || recipe.key != [C:"ae2:${plan.processor}_processor".toString(), A:"ae2:speed_card",
+                            F:"ae2:fluix_crystal", P:"appliedtiers:${plan.previous}_molecular_assembler".toString(),
+                            M:"ae2:molecular_assembler"]
+                        || recipe.result != [id:"appliedtiers:${id}".toString(), count:1]) {
+                    throw new GradleException("Incorrect approved recipe for ${tier}")
+                }
+                logger.lifecycle("Verified ${tier} assembler: approved texture hash, compact GUI, item, model, lights and recipe")
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifyHigherAssemblerAssets"
+}
+
+
+tasks.register("verifySpectralAssets") {
+    dependsOn addonJar
+    doLast {
+        def approved = [
+                "assets/appliedtiers/textures/block/advanced_molecular_assembler.png": "8ab434891b3a058ce8d3d56ad4e110c29c23881b0f59534572369402ed6120ca",
+                "assets/appliedtiers/textures/block/advanced/pattern_provider_alternate_arrow.png": "9b8c9e76e5bebf9baf7dc6ab070ff2192ccfcd456204ed153617c862938f6262",
+                "assets/appliedtiers/textures/block/advanced/pattern_provider_alternate_front.png": "a8c7088174e265e244d0753c8b79647fb380535b06c2d64f6ab7eeb19a0bfa0a",
+                "assets/appliedtiers/textures/block/advanced/pattern_provider_alternate.png": "c0bd1c1f4a8b377bf38e0d7a283ecd33fa6b20f7c2c9a5e3070cd3bce186709c",
+                "assets/appliedtiers/textures/block/advanced/pattern_provider.png": "94a4a24ddb07c162556ca9539abdf333629634ed3b8a92191d04b3eb2ee67eda",
+                "assets/appliedtiers/textures/part/advanced/pattern_provider_back.png": "d0255057c1ffec32ed0b213f19f3b254316e6d0303218366b0a26e480b5dbae2",
+                "assets/appliedtiers/textures/part/advanced/pattern_provider.png": "11f9752dae5928728f37daccbbfcffdffec7cd95e175181146d78ad9392fb95f",
+                "assets/appliedtiers/textures/block/elite_molecular_assembler.png": "089bbd758a8b5d255162eb37f4d199a241653a283de44fe610ddc68da803b156",
+                "assets/appliedtiers/textures/block/elite/pattern_provider_alternate_arrow.png": "5653f0a402cb7e4dbfff9ee92e24136bd2cd78e96a94431b7b1f3752a84c1e64",
+                "assets/appliedtiers/textures/block/elite/pattern_provider_alternate_front.png": "a0828f62bc5510da39e193a4b08001ea57246fee37ff7eff9a2037064b99ef60",
+                "assets/appliedtiers/textures/block/elite/pattern_provider_alternate.png": "9d632fcae592cd1c2f53ae7b6ee9323f42f383754435ab1e45668872c2802ae4",
+                "assets/appliedtiers/textures/block/elite/pattern_provider.png": "f1797765634d6d49179d96efa950cd3f02bb778f41cf01b3fc6c6400500ec153",
+                "assets/appliedtiers/textures/part/elite/pattern_provider_back.png": "a5412d8d840810f411786c0eb9bda02ccbde33a38e64061339cbd67a27fdd23b",
+                "assets/appliedtiers/textures/part/elite/pattern_provider.png": "2ce7e4ba144de91e7f1e47b633e653ae9f42b879eb00a1e88d2432671b91aacf",
+                "assets/appliedtiers/textures/block/ultimate_molecular_assembler.png": "c74334d8e3535a4ae4eda30797df3b30985c2b6432e2096ea2783f6f8f5aadb7",
+                "assets/appliedtiers/textures/block/ultimate/pattern_provider_alternate_arrow.png": "0db96c4fcd14d087c5d0ca1f20ca1bd59d84b9e08c6069e1c980400cae9b930a",
+                "assets/appliedtiers/textures/block/ultimate/pattern_provider_alternate_front.png": "e012c3fc6ae31fec9c2c3759da1e3f850ebf14fd552fed9661f799fe5577efc3",
+                "assets/appliedtiers/textures/block/ultimate/pattern_provider_alternate.png": "41dfe6abf473674bf29062bc8d17975b1d2353309c9d6bfd725e10fb2f1fa46b",
+                "assets/appliedtiers/textures/block/ultimate/pattern_provider.png": "f8dee261255a2a99a15907f4d8b924bfb63c49ddbd29d2878ec2f08708932464",
+                "assets/appliedtiers/textures/part/ultimate/pattern_provider_back.png": "26cf63d5cf238b2ddf656be19ea9447904f9d73e6e44473569991d8ea5acf9cf",
+                "assets/appliedtiers/textures/part/ultimate/pattern_provider.png": "e5986ef2ad2ebe5689895a76bd5e6c6947bf725946b6aa83c879f2eeaefab18c"
+        ]
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            approved.each { path, expected ->
+                def entry = jar.getEntry(path)
+                if (entry == null) throw new GradleException("Missing approved Spectral texture: ${path}")
+                def actual = jar.getInputStream(entry).withCloseable {
+                    java.security.MessageDigest.getInstance("SHA-256").digest(it.bytes).encodeHex().toString()
+                }
+                if (actual != expected) throw new GradleException("Spectral texture differs from approved study: ${path}")
+            }
+        }
+        logger.lifecycle("Verified all 21 exact approved Spectral texture hashes in the JAR")
+    }
+}
+
+tasks.named("check") {
+    dependsOn "verifySpectralAssets"
+}
+
+tasks.register("verifyCoprocessingAssets") {
+    dependsOn addonJar
+    doLast {
+        def approved = [
+            "assets/appliedtiers/textures/block/crafting/advanced/accelerator_light.png": "a9333c4ca5a7c709739daf64982d22b1c84e8f10c6ba4bd79fa070d0d8d96f27",
+            "assets/appliedtiers/textures/block/crafting/advanced/accelerator.png": "627f31fd1f8f77744832e013f7f2115c473e917945ca4a1580f65931452970f9",
+            "assets/appliedtiers/textures/block/crafting/elite/accelerator_light.png": "31b83ebf5d5c4b6ab8d6a9e046aa3c2f4eb650aaa1493804284163260a1a8aad",
+            "assets/appliedtiers/textures/block/crafting/elite/accelerator.png": "e69a0bbf532c1b3fce2ff3a2a7ae7d78a8488dd0799b846f88800af21627f0bd",
+            "assets/appliedtiers/textures/block/crafting/ultimate/accelerator_light.png": "6b1fa9f76fe525f6564c24619534b2be2997f03f5ac8be75eef1ccea46f47dae",
+            "assets/appliedtiers/textures/block/crafting/ultimate/accelerator.png": "48e156d53b9b4415cd863739100a96a7a3dad611bf63285d204924fc2de25c5b"
+        ]
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            approved.each { path, expected ->
+                def entry = jar.getEntry(path)
+                if (!entry) throw new GradleException("Missing coprocessor texture: " + path)
+                def bytes = jar.getInputStream(entry).withCloseable { it.bytes }
+                def actual = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).encodeHex().toString()
+                if (actual != expected) throw new GradleException("Incorrect approved texture: " + path)
+                def image = javax.imageio.ImageIO.read(new ByteArrayInputStream(bytes))
+                assert image.width == 16 && image.height == 16 && image.colorModel.hasAlpha()
+            }
+            def readJson = { path ->
+                def entry = jar.getEntry(path)
+                if (!entry) throw new GradleException("Missing coprocessor resource: " + path)
+                jar.getInputStream(entry).withCloseable { new groovy.json.JsonSlurper().parse(it) }
+            }
+            ["advanced", "elite", "ultimate"].each { tier ->
+                def id = tier + "_crafting_accelerator"
+                def assets = "assets/appliedtiers/"
+                def model = "appliedtiers:block/" + id
+                def states = readJson(assets + "blockstates/" + id + ".json")
+                assert states.variants["formed=false"].model == model
+                assert states.variants["formed=true"].type == "appliedtiers:crafting_cube"
+                assert states.variants["formed=true"].tier == tier
+                assert readJson(assets + "items/" + id + ".json").model.model == model
+                assert readJson(assets + "models/block/" + id + ".json").textures.all == "appliedtiers:block/crafting/" + tier + "/accelerator"
+                assert readJson("data/appliedtiers/recipe/" + id + ".json").result.id == "appliedtiers:" + id
+                assert readJson("data/appliedtiers/loot_table/blocks/" + id + ".json").pools[0].entries[0].name == "appliedtiers:" + id
+                assert readJson("data/minecraft/tags/block/mineable/pickaxe.json").values.contains("appliedtiers:" + id)
+            }
+        }
+        logger.lifecycle("Verified all six approved coprocessing textures and packaged models")
+    }
+}
+tasks.named("check") { dependsOn "verifyCoprocessingAssets" }
+
+tasks.register("verifyLicenseNotices") {
+    dependsOn addonJar
+    doLast {
+        new java.util.zip.ZipFile(addonJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            ["META-INF/AE2-LICENSE.txt", "META-INF/AE2-API-LICENSE.txt", "META-INF/APPLIED-TIERS-NOTICE.md"].each { path ->
+                if (jar.getEntry(path) == null) throw new GradleException("Missing license notice: " + path)
+            }
+            def license = jar.getInputStream(jar.getEntry("META-INF/AE2-LICENSE.txt")).withCloseable { it.getText("UTF-8") }
+            assert license.contains("GNU LESSER GENERAL PUBLIC LICENSE") && license.contains("GNU GENERAL PUBLIC LICENSE")
+            def metadata = jar.getInputStream(jar.getEntry("META-INF/neoforge.mods.toml")).withCloseable { it.getText("UTF-8") }
+            assert metadata.contains('license="LGPL-3.0-or-later"')
+        }
+        logger.lifecycle("Verified LGPL/GPL texts, API attribution and mod license metadata")
+    }
+}
+tasks.named("check") { dependsOn "verifyLicenseNotices" }

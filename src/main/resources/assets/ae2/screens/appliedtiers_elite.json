@@ -1,0 +1,71 @@
+{
+  "$schema": "schema.json",
+  "includes": [
+    "common/common.json",
+    "common/player_inventory.json"
+  ],
+  "background": {
+    "texture": "guis/appliedtiers_elite_compact.png",
+    "srcRect": [
+      0,
+      0,
+      176,
+      241
+    ],
+    "textureWidth": 256,
+    "textureHeight": 256
+  },
+  "slots": {
+    "ENCODED_PATTERN": {
+      "left": 8,
+      "top": 33,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "STORAGE": {
+      "left": 8,
+      "top": 123,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "block.appliedtiers.elite_pattern_provider"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "interface_config": {
+      "text": {
+        "translate": "gui.ae2.Patterns"
+      },
+      "position": {
+        "left": 8,
+        "top": 22
+      }
+    },
+    "interface_stored_items": {
+      "text": {
+        "translate": "gui.ae2.ReturnInventory"
+      },
+      "position": {
+        "left": 8,
+        "top": 112
+      }
+    }
+  },
+  "widgets": {
+    "openPriority": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "lockReason": {
+      "left": 5,
+      "top": 15
+    }
+  }
+}

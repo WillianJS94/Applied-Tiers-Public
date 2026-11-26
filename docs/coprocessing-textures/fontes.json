@@ -1,0 +1,147 @@
+{
+  "tag": "v26.1.14-beta",
+  "commit": "1a48466e60e8f4cb940c5e5e6471b6bdf197079d",
+  "arquivos": [
+    {
+      "arquivo": "16k_storage.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/16k_storage.png",
+      "git_blob": "63b17f92d3816673cb83a199acd71ac2edf9650a"
+    },
+    {
+      "arquivo": "16k_storage_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/16k_storage_light.png",
+      "git_blob": "196d063d313af8e58d2ab0dc4c433d2d4cb06d29"
+    },
+    {
+      "arquivo": "1k_storage.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/1k_storage.png",
+      "git_blob": "aa34cdf217fd39202956a65d1481a30fcccd618f"
+    },
+    {
+      "arquivo": "1k_storage_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/1k_storage_light.png",
+      "git_blob": "cf79a5d0cd5679aea864415b37af10f9729fe1d7"
+    },
+    {
+      "arquivo": "256k_storage.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/256k_storage.png",
+      "git_blob": "9d8662c30f225fb80024df7d2730d58c207e1533"
+    },
+    {
+      "arquivo": "256k_storage_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/256k_storage_light.png",
+      "git_blob": "2b54df0d1ba3d9e52a2addbad52f6aafcda8edf6"
+    },
+    {
+      "arquivo": "4k_storage.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/4k_storage.png",
+      "git_blob": "48f92014455fe00fca48c2363575a9bf6c7229fd"
+    },
+    {
+      "arquivo": "4k_storage_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/4k_storage_light.png",
+      "git_blob": "7d9ae119a6003fe15f0e73bfbf75484ee0df6849"
+    },
+    {
+      "arquivo": "64k_storage.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/64k_storage.png",
+      "git_blob": "a2f789b1b722a3fd390cec20b6805b84a52e1c95"
+    },
+    {
+      "arquivo": "64k_storage_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/64k_storage_light.png",
+      "git_blob": "e2d45277090fa1f1a983e975cb4df32915d1adc7"
+    },
+    {
+      "arquivo": "accelerator.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/accelerator.png",
+      "git_blob": "b0e58d2bfa7cad632a7e5bd37987cbc23c1a487c"
+    },
+    {
+      "arquivo": "accelerator_light.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/accelerator_light.png",
+      "git_blob": "87f4fa46cefa93e2e7491dc2295419c448ac6a1e"
+    },
+    {
+      "arquivo": "light_base.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/light_base.png",
+      "git_blob": "56f2e1fe7bf360dc384d332c0b083980bac01e8b"
+    },
+    {
+      "arquivo": "monitor.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/monitor.png",
+      "git_blob": "c6cde67c5650a4ae6804b58c0b62a84f2af7305d"
+    },
+    {
+      "arquivo": "monitor_base.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/monitor_base.png",
+      "git_blob": "f677ee83a3b49b7ffdc4f121b5f6d55e7a66119a"
+    },
+    {
+      "arquivo": "monitor_light_bright.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/monitor_light_bright.png",
+      "git_blob": "6eb2f8070b123626de2d8d46e9ed62ec066d1c36"
+    },
+    {
+      "arquivo": "monitor_light_dark.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/monitor_light_dark.png",
+      "git_blob": "03433f68a313e47ca0c2d2f7d8b6e73696f92a26"
+    },
+    {
+      "arquivo": "monitor_light_medium.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/monitor_light_medium.png",
+      "git_blob": "4eeefd3166c0da028e580761ec0e4121277facb0"
+    },
+    {
+      "arquivo": "ring_corner.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/ring_corner.png",
+      "git_blob": "38331e3ec54225c504a351238782928e60b2a596"
+    },
+    {
+      "arquivo": "ring_side_hor.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/ring_side_hor.png",
+      "git_blob": "4e8493aeb8d97ebb038ab5d14de8431e45adfc28"
+    },
+    {
+      "arquivo": "ring_side_ver.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/ring_side_ver.png",
+      "git_blob": "f92f6f0fb0584e199a13c57e6847291894af354e"
+    },
+    {
+      "arquivo": "unit.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/unit.png",
+      "git_blob": "5f749fd6bfa680c1017caa8f66ab43af2aa75ee2"
+    },
+    {
+      "arquivo": "unit_base.png",
+      "caminho": "src/main/resources/assets/ae2/textures/block/crafting/unit_base.png",
+      "git_blob": "07de733998417b7f8428ebc7e88b3ebfcb1ffcb2"
+    }
+  ],
+  "modelos": [
+    {
+      "caminho": "src/client/java/appeng/client/render/crafting/CraftingCubeModel.java",
+      "git_blob": "66d9bdaa4ef5593bad9450091217ac70e4ecac72"
+    },
+    {
+      "caminho": "src/client/java/appeng/client/render/crafting/CraftingUnitModelProvider.java",
+      "git_blob": "6aff53eb5f9a0038cda0508f78ecedcc46787923"
+    },
+    {
+      "caminho": "src/client/java/appeng/client/render/crafting/LightBakedModel.java",
+      "git_blob": "34aef78ac968c375a941a2e16217cd29c6143c57"
+    },
+    {
+      "caminho": "src/client/java/appeng/client/render/crafting/MonitorBakedModel.java",
+      "git_blob": "aa8a26b63856eda3e72468241028e652f5fd8fa8"
+    },
+    {
+      "caminho": "src/client/java/appeng/client/render/crafting/UnitBakedModel.java",
+      "git_blob": "20629efbc24340a5195581bcf7536b3efecbfd59"
+    },
+    {
+      "caminho": "src/main/java/appeng/client/render/CubeBuilder.java",
+      "git_blob": "34c53764b2bcfb015e11618c6983ad50a8136a4e"
+    }
+  ]
+}

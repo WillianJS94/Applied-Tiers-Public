@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "appliedtiers:advanced_molecular_assembler",
+    "appliedtiers:elite_molecular_assembler",
+    "appliedtiers:ultimate_molecular_assembler",
+    "appliedtiers:advanced_crafting_accelerator",
+    "appliedtiers:elite_crafting_accelerator",
+    "appliedtiers:ultimate_crafting_accelerator"
+  ]
+}

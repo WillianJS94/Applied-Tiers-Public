@@ -1,0 +1,8 @@
+{
+  "parent": "ae2:item/cable_pattern_provider",
+  "textures": {
+    "front": "appliedtiers:part/elite/pattern_provider",
+    "back": "appliedtiers:part/elite/pattern_provider_back",
+    "particle": "appliedtiers:part/elite/pattern_provider"
+  }
+}

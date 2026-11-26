@@ -1,0 +1,12 @@
+{
+  "parent": "ae2:block/pattern_provider_oriented",
+  "textures": {
+    "particle": "appliedtiers:block/elite/pattern_provider",
+    "down": "appliedtiers:block/elite/pattern_provider_alternate",
+    "up": "appliedtiers:block/elite/pattern_provider_alternate_front",
+    "north": "appliedtiers:block/elite/pattern_provider_alternate_arrow",
+    "south": "appliedtiers:block/elite/pattern_provider_alternate_arrow",
+    "east": "appliedtiers:block/elite/pattern_provider_alternate_arrow",
+    "west": "appliedtiers:block/elite/pattern_provider_alternate_arrow"
+  }
+}

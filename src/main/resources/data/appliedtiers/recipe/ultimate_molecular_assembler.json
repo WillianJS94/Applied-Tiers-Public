@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CAC",
+    "FPF",
+    "AMA"
+  ],
+  "key": {
+    "C": "ae2:engineering_processor",
+    "A": "ae2:speed_card",
+    "F": "ae2:fluix_crystal",
+    "P": "appliedtiers:elite_molecular_assembler",
+    "M": "ae2:molecular_assembler"
+  },
+  "result": {
+    "id": "appliedtiers:ultimate_molecular_assembler",
+    "count": 1
+  }
+}

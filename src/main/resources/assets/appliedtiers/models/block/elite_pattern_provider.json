@@ -1,0 +1,6 @@
+{
+  "parent": "ae2:block/pattern_provider",
+  "textures": {
+    "all": "appliedtiers:block/elite/pattern_provider"
+  }
+}

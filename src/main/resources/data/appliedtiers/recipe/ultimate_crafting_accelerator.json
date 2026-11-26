@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "FCF",
+    "CPC",
+    "FMF"
+  ],
+  "key": {
+    "F": "ae2:fluix_crystal",
+    "C": "ae2:engineering_processor",
+    "P": "appliedtiers:elite_crafting_accelerator",
+    "M": "ae2:crafting_accelerator"
+  },
+  "result": {
+    "id": "appliedtiers:ultimate_crafting_accelerator",
+    "count": 1
+  }
+}

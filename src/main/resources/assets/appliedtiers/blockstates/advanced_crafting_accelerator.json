@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "formed=false": {
+      "model": "appliedtiers:block/advanced_crafting_accelerator"
+    },
+    "formed=true": {
+      "type": "appliedtiers:crafting_cube",
+      "tier": "advanced"
+    }
+  }
+}

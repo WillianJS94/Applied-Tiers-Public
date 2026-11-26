@@ -1,0 +1,9 @@
+{
+  "parent": "ae2:part/pattern_provider_base",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "front": "appliedtiers:part/ultimate/pattern_provider",
+    "back": "appliedtiers:part/ultimate/pattern_provider_back",
+    "particle": "appliedtiers:part/ultimate/pattern_provider_back"
+  }
+}

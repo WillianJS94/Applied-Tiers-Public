@@ -1,0 +1,83 @@
+{
+  "fonte_verificada": "1a48466e60e8f4cb940c5e5e6471b6bdf197079d",
+  "arquivos": [
+    {
+      "arquivo": "variantes/A/Advanced/accelerator.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 100,
+      "sha256": "627F31FD1F8F77744832E013F7F2115C473E917945CA4A1580F65931452970F9",
+      "mapa": {
+        "b06fdd": "7690DE",
+        "e291e3": "A6B7EA",
+        "915dcd": "5568A0"
+      }
+    },
+    {
+      "arquivo": "variantes/B/Advanced/accelerator_light.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 44,
+      "sha256": "A9333C4CA5A7C709739DAF64982D22B1C84E8F10C6BA4BD79FA070D0D8D96F27",
+      "mapa": {
+        "b06fdd": "7690DE",
+        "e291e3": "A6B7EA",
+        "915dcd": "5568A0"
+      }
+    },
+    {
+      "arquivo": "variantes/A/Elite/accelerator.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 100,
+      "sha256": "E69A0BBF532C1B3FCE2FF3A2A7AE7D78A8488DD0799B846F88800AF21627F0BD",
+      "mapa": {
+        "b06fdd": "E59A57",
+        "e291e3": "EEBD92",
+        "915dcd": "A56F3F"
+      }
+    },
+    {
+      "arquivo": "variantes/B/Elite/accelerator_light.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 44,
+      "sha256": "31B83EBF5D5C4B6AB8D6A9E046AA3C2F4EB650AAA1493804284163260A1A8AAD",
+      "mapa": {
+        "b06fdd": "E59A57",
+        "e291e3": "EEBD92",
+        "915dcd": "A56F3F"
+      }
+    },
+    {
+      "arquivo": "variantes/A/Ultimate/accelerator.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 100,
+      "sha256": "48E156D53B9B4415CD863739100A96A7A3DAD611BF63285D204924FC2DE25C5B",
+      "mapa": {
+        "b06fdd": "D96DB8",
+        "e291e3": "E6A0D1",
+        "915dcd": "9C4E84"
+      }
+    },
+    {
+      "arquivo": "variantes/B/Ultimate/accelerator_light.png",
+      "resolucao": "16x16",
+      "alfa": "idêntico",
+      "pixels_recoloridos": 44,
+      "sha256": "6B1FA9F76FE525F6564C24619534B2BE2997F03F5AC8BE75EEF1CCEA46F47DAE",
+      "mapa": {
+        "b06fdd": "D96DB8",
+        "e291e3": "E6A0D1",
+        "915dcd": "9C4E84"
+      }
+    }
+  ],
+  "opcao_A_luz": "byte a byte original",
+  "opcao_B_luz": "44 pixels opacos; alfa e RGB transparentes preservados",
+  "nucleo": "100 pixels",
+  "moldura": "arquivos originais intactos",
+  "estados": "camada luminosa presente tanto sem energia quanto energizada",
+  "ambient": 0.64
+}
